@@ -22,6 +22,7 @@ public abstract class Entity {
         SnapshotParameters params = new SnapshotParameters();
         params.setFill(Color.TRANSPARENT);
 
+
         ImageView iv = new ImageView(img);
         Image base = iv.snapshot(params, null);
 

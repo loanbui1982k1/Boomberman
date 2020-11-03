@@ -6,6 +6,9 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.paint.Color;
 
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+
 public class Bomber extends Entity {
 
     public Bomber(int x, int y, Image img) {
@@ -16,4 +19,5 @@ public class Bomber extends Entity {
     public void update() {
 
     }
+    
 }
