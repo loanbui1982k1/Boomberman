@@ -11,13 +11,18 @@ import java.awt.event.KeyListener;
 
 public class Bomber extends Entity {
 
-    public Bomber(int x, int y, Image img) {
+    public Bomber() {
+
+    }
+    public Bomber(double x, double y, Image img) {
         super( x, y, img);
     }
 
     @Override
     public void update() {
-
+       super.setX(x);
+       super.setY(y);
+       super.setImg(img);
     }
-    
+
 }
