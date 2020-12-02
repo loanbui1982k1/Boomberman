@@ -7,169 +7,226 @@ import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
-import javafx.stage.Stage;
-import uet.oop.bomberman.entities.*;
-import uet.oop.bomberman.graphics.Sprite;
+import javafx.scene.control.Button;
 
-import java.io.File;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.*;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.stage.Stage;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Text;
+import uet.oop.bomberman.graphics.Sprite;
+import uet.oop.bomberman.sound.Sound;
+
+
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 
 public class BombermanGame extends Application {
+    public static GraphicsContext gc;
+    public static Canvas canvas;
+    public static GraphicsContext gcForPlayer;
+    public static Scene gameScene;
+    private java.util.List<Text> textList = new ArrayList<>();
 
-    public static final int WIDTH = 31;
-    public static final int HEIGHT = 13;
+    public static Board board;
+    public static KeyBoard keyBoard;
+    private Text textScore;
+    private Text textTime;
+    private Text textLevel;
+    private Text playerHealth;
 
-    private GraphicsContext gc;
-    private Canvas canvas;
-    private Canvas canvasForPlayer;
-    private GraphicsContext gcForPlayer;
-
-
-    private Scene gameScene;
-    private Group gameRoot;
-    public static char[][] map = new char[HEIGHT][WIDTH];
-    private List<Entity> entities = new ArrayList<>();
-    private List<Entity> stillObjects = new ArrayList<>();
-    Bomber player;
+    private static final int MENU_WIDTH = 992;
+    private static final int MENU_HEIGHT = 480;
+    private AnchorPane menuPane;
+    private Scene menuScene;
+    private Stage menuStage;
+    private Button startButton;
 
 
-    private double speedOfPlayer = 0.05;
-
-    public static void main(String[] args) throws FileNotFoundException {
+    public static void main(String[] args) {
         Application.launch(BombermanGame.class);
     }
 
 
-
-    @Override
-    public void start(Stage stage) throws FileNotFoundException {
-        // Tao Canvas
-        initializeStage();
-        stage.setScene(gameScene);
+    public void start(Stage stage) {
+        createMenu();
+        stage = menuStage;
+        Stage finalStage = stage;
         stage.show();
 
-
-        AnimationTimer timer = new AnimationTimer() {
+        startButton.setOnMousePressed(new EventHandler<MouseEvent>() {
             @Override
-            public void handle(long l) {
-                update();
-                render();
+            public void handle(MouseEvent event) {
+                if (event.getButton().equals(MouseButton.PRIMARY)) {
+                    try {
+                        initNewGame();
+                        createTextScene();
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                    initializeStage();
+                    finalStage.setScene(gameScene);
+                    finalStage.show();
+
+                    AnimationTimer timer = new AnimationTimer() {
+                        @Override
+                        public void handle(long l) {
+                            update();
+                            board.render();
+                            board.update();
+                            if (Board.getPlayer().isDie()  || Board.countDownTime < 0) {
+                                String res = "Game Over !!!";
+                                endGame(res);
+                                finalStage.setScene(gameScene);
+                            }
+                            if (Board.getPlayer().isWin()) {
+                                Board.scorePrevious = 0;
+                                BombermanGame.board.setLevel(1);
+                                Board.getPlayer().setHealth(3);
+                                Board.getPlayer().updateStatus();
+                                String res = "YOU WIN !!!";
+                                endGame(res);
+                                finalStage.setScene(gameScene);
+                            }
+                        }
+                    };
+
+                    timer.start();
+
+                    keyBoard.status(gameScene); // bat su kien
+                    Sound.play("ghost");
+                    board.countDown();
+                }
+
             }
-        };
-        timer.start();
+        });
 
-        createMap();
+    }
 
-        creatKeyListener();
-        player = new Bomber(1, 1, Sprite.player_right.getFxImage(), speedOfPlayer);
-        entities.add(player);
 
+    public void initNewGame() throws FileNotFoundException {
+        board = new Board();
+        keyBoard = new KeyBoard();
+        board.getGameLevel().createMapLevel(board.getLevel());
+    }
+
+    public void createTextScene() {
+        Text textS = new Text(30, 35, "Score: ");
+        Text textT = new Text(230, 35, "Time: ");
+
+        textS.setFill(Color.WHITE);
+        textS.setFont(new Font(20));
+
+        textT.setFill(Color.WHITE);
+        textT.setFont(new Font(20));
+
+        textList.add(textS);
+        textList.add(textT);
+
+        textScore = new Text(130, 35, String.valueOf(Board.score + Board.scorePrevious));
+        textScore.setFill(Color.WHITE);
+        textScore.setFont(new Font(20));
+
+        textList.add(textScore);
+
+        textTime = new Text(290, 35, String.valueOf(Board.countDownTime / 60));
+        textTime.setFill(Color.WHITE);
+        textTime.setFont(new Font(20));
+
+        textList.add(textTime);
+
+        Text textL = new Text(600, 35, "Level: ");
+        textL.setFill(Color.WHITE);
+        textL.setFont(new Font(20));
+        textList.add(textL);
+
+        textLevel = new Text(670, 35, String.valueOf(board.getLevel()));
+        textLevel.setFill(Color.WHITE);
+        textLevel.setFont(new Font(20));
+        textList.add(textLevel);
+
+        Text textLeft = new Text(400, 35, "Left: ");
+        textLeft.setFill(Color.WHITE);
+        textLeft.setFont(new Font(20));
+        textList.add(textLeft);
+
+        playerHealth = new Text(450, 35, String.valueOf(Board.getPlayer().getHealth()));
+        playerHealth.setFill(Color.WHITE);
+        playerHealth.setFont(new Font(20));
+        textList.add(playerHealth);
 
     }
 
     public void initializeStage() {
-        canvas = new Canvas(Sprite.SCALED_SIZE * WIDTH, Sprite.SCALED_SIZE * HEIGHT);
+        canvas = new Canvas(Sprite.SCALED_SIZE * Board.WIDTH, Sprite.SCALED_SIZE * (Board.HEIGHT + 2));
         gc = canvas.getGraphicsContext2D();
 
-        canvasForPlayer = new Canvas(Sprite.SCALED_SIZE * WIDTH, Sprite.SCALED_SIZE * HEIGHT);
+
+        Canvas canvasForPlayer = new Canvas(Sprite.SCALED_SIZE * Board.WIDTH, Sprite.SCALED_SIZE * (Board.HEIGHT + 2));
         gcForPlayer = canvasForPlayer.getGraphicsContext2D();
 
-        gameRoot = new Group();
+        Group gameRoot = new Group();
         gameRoot.getChildren().add(canvas);
         gameRoot.getChildren().add(canvasForPlayer);
 
-        // Tao scene
-        gameScene = new Scene(gameRoot);
+        gameRoot.getChildren().addAll(textList);
 
-    }
+        gameScene = new Scene(gameRoot, Sprite.SCALED_SIZE * Board.WIDTH, Sprite.SCALED_SIZE * (Board.HEIGHT + 2), Color.BLACK);
 
-    public void createMap() throws FileNotFoundException {
-
-        Scanner scanner = new Scanner(new File("C:\\Users\\DELL\\OneDrive\\Máy tính\\Boomberman\\res\\levels\\Level1.txt"));
-        int row = 0;
-        while (scanner.hasNextLine()) {
-            String line = scanner.nextLine();
-            for (int i = 0; i < line.length(); i++) {
-                map[row][i] = line.charAt(i);
-            }
-            row++;
-        }
-
-        for (int i = 0; i < HEIGHT; i++) {
-            for (int j = 0; j < WIDTH; j++) {
-                Entity object;
-                if (map[i][j] == '#') {
-                    object = new Wall(j, i, Sprite.wall.getFxImage());
-                } else if (map[i][j] == '*') {
-                    object = new Brick(j, i, Sprite.brick.getFxImage());
-                } else {
-                    object = new Grass(j, i, Sprite.grass.getFxImage());
-                }
-                stillObjects.add(object);
-            }
-        }
-        stillObjects.forEach(g -> g.render(gc));
     }
 
     public void update() {
-            entities.forEach(Entity::update);
+        playerHealth.setText(String.valueOf(Board.getPlayer().getHealth()));
+        textLevel.setText(String.valueOf(board.getLevel()));
+        textScore.setText(String.valueOf(Board.score + Board.scorePrevious));
+        textTime.setText(String.valueOf(board.countDown() / 60));
     }
 
 
-    public void render() {
-        gcForPlayer.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-        entities.forEach(g -> g.render(gcForPlayer));
+    private void createMenu() {
+        menuPane = new AnchorPane();
+        menuScene = new Scene(menuPane, MENU_WIDTH, MENU_HEIGHT);
+        menuStage = new Stage();
+        menuStage.setScene(menuScene);
+        createBackGround();
+        createStartButton();
     }
 
+    private void createStartButton() {
+        InputStream input = getClass().getResourceAsStream("/button/start.png");
 
+        javafx.scene.image.Image image = new Image(input);
+        ImageView imageView = new ImageView(image);
+        startButton = new Button("", imageView);
+        startButton.setStyle("-fx-background-color: #000000; ");
 
-    public void creatKeyListener() {
-        gameScene.setOnKeyPressed(new EventHandler<KeyEvent>() {
-            @Override
-            public void handle(KeyEvent event) {
-                switch (event.getCode()) {
-                    case LEFT:
-                        player.setLeftKeyPress(true);
-                        break;
-                    case RIGHT:
-                        player.setRightKeyPress(true);
-                        break;
-                    case UP:
-                        player.setUpKeyPress(true);
-                        break;
-                    case DOWN:
-                        player.setDownKeyPress(true);
-                        break;
-                }
-            }
-        });
-
-        gameScene.setOnKeyReleased(new EventHandler<KeyEvent>() {
-            @Override
-            public void handle(KeyEvent event) {
-                switch (event.getCode()) {
-                    case LEFT:
-                        player.setLeftKeyPress(false);
-                        break;
-                    case RIGHT:
-                        player.setRightKeyPress(false);
-                        break;
-                    case UP:
-                        player.setUpKeyPress(false);
-                        break;
-                    case DOWN:
-                        player.setDownKeyPress(false);
-                        break;
-                }
-            }
-        });
+        menuPane.getChildren().add(startButton);
+        startButton.setLayoutX(450);
+        startButton.setLayoutY(350);
 
     }
 
+    private void createBackGround() {
+        Image back = new Image("/background/bomba.png", MENU_WIDTH, MENU_HEIGHT, false, true);
+        BackgroundImage backMenu = new BackgroundImage(back, BackgroundRepeat.REPEAT, BackgroundRepeat.REPEAT, BackgroundPosition.DEFAULT, null);
+        menuPane.setBackground(new Background(backMenu));
+    }
 
+    private void endGame(String string) {
+        Group gameRoot = new Group();
+        Text textOver = new Text(250, 240, string);
+
+        textOver.setFont(Font.font("Arial", FontWeight.BOLD, 80));
+        textOver.setFill(Color.WHITE);
+
+        gameRoot.getChildren().add(textOver);
+        gameScene = new Scene(gameRoot, Sprite.SCALED_SIZE * Board.WIDTH, Sprite.SCALED_SIZE * (Board.HEIGHT + 2), Color.BLACK);
+    }
 }
